@@ -60,6 +60,19 @@ def drop(train, test, bye = ['Ticket', 'SibSp', 'Parch']):
             del i[z]
     return train, test
 
+
+def family_size_int(train, test):
+  for i in [train, test]:
+    i['FamilySize'] = i.Parch + i.SibSp + 1
+  return train, test
+
+
+def add_last_name(train, test):
+  for i in [train, test]:
+    i['LastName'] = i['Name'].str.split(',').str[0]
+  return train, test
+
+
 def fam_size(train, test):
     for i in [train, test]:
         i['Fam_Size'] = np.where((i['SibSp']+i['Parch']) == 0 , 'Solo',
@@ -67,6 +80,7 @@ def fam_size(train, test):
         del i['SibSp']
         del i['Parch']
     return train, test
+
 
 def lda(X_train, X_test, y_train, cols=['Age', 'Fare']):
     sc = StandardScaler()
