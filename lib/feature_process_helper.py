@@ -7,7 +7,7 @@ def names(train, test):
     for i in [train, test]:
         i['Name_Len'] = i['Name'].apply(lambda x: len(x))
         i['Name_Title'] = i['Name'].apply(lambda x: x.split(',')[1]).apply(lambda x: x.split()[0])
-        del i['Name']
+        # del i['Name']
     return train, test
 
 def age_impute(train, test):
@@ -35,7 +35,7 @@ def age_impute2(train, test):
 def cabin(train, test):
     for i in [train, test]:
         i['Cabin_Letter'] = i['Cabin'].apply(lambda x: str(x)[0])
-        del i['Cabin']
+        # del i['Cabin']
     return train, test
 
 def embarked_impute(train, test):
@@ -77,8 +77,8 @@ def fam_size(train, test):
     for i in [train, test]:
         i['Fam_Size'] = np.where((i['SibSp']+i['Parch']) == 0 , 'Solo',
                            np.where((i['SibSp']+i['Parch']) <= 3,'Nuclear', 'Big'))
-        del i['SibSp']
-        del i['Parch']
+        # del i['SibSp']
+        # del i['Parch']
     return train, test
 
 
@@ -110,7 +110,7 @@ def ticket_grouped(train, test):
                                    np.where((i['Ticket_Lett']).isin(['W', '4', '7', '6', 'L', '5', '8']),
                                             'Low_ticket', 'Other_ticket'))
         i['Ticket_Len'] = i['Ticket'].apply(lambda x: len(x))
-        del i['Ticket']
+        # del i['Ticket']
     return train, test
 
 def ticket_grouped2(train, test):
@@ -121,7 +121,7 @@ def ticket_grouped2(train, test):
                                    np.where((i['Ticket_Lett']).isin(['W', '4', '7', '6', 'L', '5', '8']),
                                             'Low_ticket', 'Other_ticket'))
         i['Ticket_Len'] = i['Ticket'].apply(lambda x: len(x))
-        del i['Ticket']
+        # del i['Ticket']
     return train, test
 
 def cabin_num(train, test):
