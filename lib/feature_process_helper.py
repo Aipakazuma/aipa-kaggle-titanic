@@ -10,6 +10,7 @@ def names(train, test):
         del i['Name']
     return train, test
 
+
 def age_impute(train, test):
     for i in [train, test]:
         i['Age_Null_Flag'] = i['Age'].apply(lambda x: 1 if pd.isnull(x) else 0)
@@ -20,6 +21,7 @@ def age_impute(train, test):
     test['Age'] = test['Age'].fillna(test['Age'].mean())
     del train['mean']
     return train, test
+
 
 def age_impute2(train, test):
     for i in [train, test]:
@@ -32,16 +34,78 @@ def age_impute2(train, test):
     del train['mean']
     return train, test
 
+
+def cabin_null_flag(train, test):
+    for i in [train, test]:
+        i['Cabin_Null_Flag'] = np.where(i['Cabin'].isnull(), 1, 0)
+    return train, test
+
+
+def ticket_dummies(train, test):
+    for i in [train, test]:
+        i['Ticket_Prefix'] = pd.Series()
+        i['Ticket_Prefix'] = i[i['Ticket'].str.match('[A-z]')]['Ticket'].apply(lambda x: x.split(' ')[0])
+        i['Ticket_Prefix'] = i['Ticket_Prefix'].fillna('Nothing')
+    return train, test
+
+
+def same_ticket_grouping(train, test, submission_df):
+    test = test.copy()
+    test.insert(1, 'Survived', submission_df['Survived'])
+    all = pd.concat([train, test], axis=0)
+    all = all[train.columns]
+    duplicate_sex_count = all[all['Ticket'].duplicated() | all['Ticket'].duplicated(keep='last')] \
+        .groupby(['Ticket', 'Sex'])[['PassengerId']] \
+        .count()
+    duplicate_sex_count_reset_index = duplicate_sex_count.reset_index()
+    duplicate_ticket_sex = duplicate_sex_count_reset_index.pivot_table(index='Ticket', columns='Sex',
+                                                                       values='PassengerId', aggfunc='count', fill_value=0).reset_index()
+    male_only = duplicate_ticket_sex[(duplicate_ticket_sex['female'] == 0) & (duplicate_ticket_sex['male'] == 1)]
+    female_only = duplicate_ticket_sex[(duplicate_ticket_sex['female'] == 1) & (duplicate_ticket_sex['male'] == 0)]
+    male_female = duplicate_ticket_sex[(duplicate_ticket_sex['female'] == 1) & (duplicate_ticket_sex['male'] == 1)]
+
+    all['SameTicket'] = pd.Series()
+    for k, v in {'Only_Male': male_only, 'Only_Female': female_only, 'Male_Female': male_female}.items():
+        all.loc[train['Ticket'].isin(v['Ticket'].tolist()), 'SameTicket'] = k
+
+    all.loc[:, 'SameTicket'] = all['SameTicket'].fillna('Not_Same')
+    train = all.iloc[:len(train), :]
+    test = all.iloc[len(train):, :]
+    del test['Survived']
+    return train, test
+
+
+def age_class(train, test):
+    for i in [train, test]:
+        i['AgeClass'] = i['Age'] // 10 * 10
+    return train, test
+
+
 def cabin(train, test):
     for i in [train, test]:
         i['Cabin_Letter'] = i['Cabin'].apply(lambda x: str(x)[0])
         del i['Cabin']
     return train, test
 
+
 def embarked_impute(train, test):
     for i in [train, test]:
         i['Embarked'] = i['Embarked'].fillna('S')
     return train, test
+
+
+# ticketの重複を数える関数を作成
+def apply_ticket_count(train, test):
+    for i in [train, test]:
+        _duplicated = i[i['Ticket'].duplicated() | i['Ticket'].duplicated(keep='last')].groupby(['Ticket'], as_index=False)[['PassengerId']].count()
+        def replace_ticket_duplicated_count(_series):
+            _is = _duplicated[_series == _duplicated['Ticket']]['PassengerId']
+            if _is.empty == False:
+                return int(_is)
+            return 0
+        i['TicketCount'] = i['Ticket'].apply(replace_ticket_duplicated_count)
+    return train, test
+
 
 def dummies(train, test, columns = ['Pclass', 'Sex', 'Embarked', 'Cabin_Letter', 'Name_Title']):
     for column in columns:
@@ -82,6 +146,12 @@ def fam_size(train, test):
     return train, test
 
 
+# def fare_length(train, test):
+#     for i in [train, test]:
+#         i['Fare_Length'] = i['Fare'].apply(lambda x: len(x))
+#     return train, test
+
+
 def lda(X_train, X_test, y_train, cols=['Age', 'Fare']):
     sc = StandardScaler()
     X_train_std = sc.fit_transform(X_train[cols])
@@ -101,6 +171,13 @@ def titles_grouped(train, test):
         i['Name_Title'] = np.where((i['Name_Title']).isin(['Mr.', 'Mrs.', 'Miss.', 'Master.', 'Dr.']),
                                    i['Name_Title'], 'other')
     return train, test
+
+
+def ticket_length(train, test):
+    for i in [train, test]:
+        i['Ticket_Len'] = i['Ticket'].apply(lambda x: len(x))
+    return train, test
+
 
 def ticket_grouped(train, test):
     for i in [train, test]:
