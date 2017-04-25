@@ -2,18 +2,43 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import LabelEncoder
 
-def names(train, test):
+
+def names(train, test, submission_df):
     for i in [train, test]:
         i['Name_Len'] = i['Name'].apply(lambda x: len(x))
         i['Name_Title'] = i['Name'].apply(lambda x: x.split(',')[1]).apply(lambda x: x.split()[0])
-        del i['Name']
+
+
+    test = test.copy()
+    test.insert(1, 'Survived', submission_df['Survived'])
+    all = pd.concat([train, test], axis=0)
+    all = all[train.columns]
+
+    all['SameLastName'] = 0
+    all.loc[all['Name'].apply(lambda x: x.split(',')[0]).duplicated() | all['Name'].apply(lambda x: x.split(',')[0]).duplicated(keep='last'), 'SameLastName'] = 1
+
+    train = all.iloc[:len(train), :]
+    test = all.iloc[len(train):, :]
+
+    del train['Name']
+    del test['Name']
+    del test['Survived']
+
+    return train, test
+
+
+def age_null_flag(train, test):
+    for i in [train, test]:
+        i['Age_Null_Flag'] = i['Age'].apply(lambda x: 1 if pd.isnull(x) else 0)
     return train, test
 
 
 def age_impute(train, test):
-    for i in [train, test]:
-        i['Age_Null_Flag'] = i['Age'].apply(lambda x: 1 if pd.isnull(x) else 0)
+    # fori in [train, test]:
+    #     i['Age_Null_Flag'] = i['Age'].apply(lambda x: 1 if pd.isnull(x) else 0)
     train['mean'] = train.groupby(['Name_Title', 'Pclass'])['Age'].transform('mean')
     train['Age'] = train['Age'].fillna(train['mean'])
     z = test.merge(train, on=['Name_Title', 'Pclass'], how='left').drop_duplicates(['PassengerId_x'])
@@ -24,8 +49,8 @@ def age_impute(train, test):
 
 
 def age_impute2(train, test):
-    for i in [train, test]:
-        i['Age_Null_Flag'] = i['Age'].apply(lambda x: 1 if pd.isnull(x) else 0)
+    # for i in [train, test]:
+    #     i['Age_Null_Flag'] = i['Age'].apply(lambda x: 1 if pd.isnull(x) else 0)
     train['mean'] = train.groupby(['Name_Title', 'Pclass'])['Age'].transform('mean')
     train['Age'] = train['Age'].fillna(train['mean'])
     z = test.merge(train, on=['Name_Title', 'Pclass'], how='left').drop_duplicates(['PassengerId_x'])
@@ -35,9 +60,35 @@ def age_impute2(train, test):
     return train, test
 
 
+# Pclassと敬称毎にグループ化した中央値をとってみる
+def age_impute3(train, test):
+    for i in [train, test]:
+        not_null_age = i.loc[i['Age'].isnull() == False, :]
+        median = not_null_age.groupby(['Pclass', 'Name_Title'])[['Age']].median().reset_index()
+
+        def grouping_pclass_name_title_median(x):
+                _pclass = median[median['Pclass'] == x['Pclass']]
+                _is_name_title = _pclass[_pclass['Name_Title'] == x['Name_Title']]
+                if _is_name_title.empty == False:
+                    return int(_is_name_title['Age'])
+                return 0
+
+        i.loc[i['Age'].isnull() == True, 'Age'] = i.loc[i['Age'].isnull() == True, ['Pclass', 'Name_Title']].apply(grouping_pclass_name_title_median, axis=1)
+    return train, test
+
+
 def cabin_null_flag(train, test):
     for i in [train, test]:
         i['Cabin_Null_Flag'] = np.where(i['Cabin'].isnull(), 1, 0)
+    return train, test
+
+
+def cabin_count(train, test):
+    for i in [train, test]:
+        i['CabinCount'] = pd.Series()
+        i.loc[i['Cabin'].isnull() == False, 'CabinCount'] = i[i['Cabin'].isnull() == False]['Cabin'].apply(lambda x: len(x.split(' ')))
+        i.loc[i['Cabin'].isnull() == True, 'CabinCount'] = 0
+        i.loc[:, 'CabinCount'] = i['CabinCount'].astype(int)
     return train, test
 
 
@@ -77,7 +128,7 @@ def same_ticket_grouping(train, test, submission_df):
 
 def age_class(train, test):
     for i in [train, test]:
-        i['AgeClass'] = i['Age'] // 10 * 10
+        i['AgeClass'] = (i['Age'] // 10 * 10).astype(int)
     return train, test
 
 
@@ -190,6 +241,7 @@ def ticket_grouped(train, test):
         del i['Ticket']
     return train, test
 
+
 def ticket_grouped2(train, test):
     for i in [train, test]:
         i['Ticket_Lett'] = i['Ticket'].apply(lambda x: str(x)[0])
@@ -200,6 +252,7 @@ def ticket_grouped2(train, test):
         i['Ticket_Len'] = i['Ticket'].apply(lambda x: len(x))
         del i['Ticket']
     return train, test
+
 
 def cabin_num(train, test):
     for i in [train, test]:
@@ -218,6 +271,41 @@ def cabin_num(train, test):
     return train, test
 
 
+def cabin_fillna(train, test, submission_df):
+    test_copy = test.copy()
+    test_copy.insert(1, 'Survived', submission_df['Survived'])
+    all = pd.concat([train, test_copy], axis=0)
+    all = all[train.columns]
+    all.loc[all['Cabin'].isnull() == False, 'CabinPrefix'] = all.loc[all['Cabin'].isnull() == False, 'Cabin'].apply(lambda x: x[0])
+    all.loc[all['Fare'].isnull() == True, 'Fare'] = all['Fare'].median()
 
+    x = all.loc[all['Cabin'].isnull() == False, ['Pclass', 'Fare']]
+    all['Name_Length'] = all['Name'].apply(lambda x: len(x))
+    x['Name_Length'] = all.loc[all['Cabin'].isnull() == False, 'Name_Length']
+    _y = all.loc[all['Cabin'].isnull() == False, 'CabinPrefix']
 
+    label = LabelEncoder()
+    label.fit(_y)
+    y = label.transform(_y)
 
+    search_parameter = {
+      'criterion': 'entropy',
+      'min_samples_leaf': 1,
+      'min_samples_split': 2,
+      'n_estimators': 100
+    }
+    rf = RandomForestClassifier(max_features='auto',
+                                    oob_score=True,
+                                    random_state=1,
+                                    n_jobs=-1)
+    rf.set_params(**search_parameter)
+    rf.fit(x, y)
+
+    all['CabinPrefix'] = label.inverse_transform(rf.predict(all[['Pclass', 'Fare', 'Name_Length']]))
+    del all['Name_Length']
+    
+    train = all.iloc[:len(train), :]
+    test = all.iloc[len(train):, ]
+    del test['Survived']
+
+    return train, test

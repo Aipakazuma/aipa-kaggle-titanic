@@ -35,15 +35,23 @@ def cross(y, predict_y):
     print('間違い: %d' % (_unexpected + _missing))
 
 
-def get_matrix(y, predict_y):
+# ランダムフォレスト用
+# 効いている説明変数をpandasにして返す
+def get_feature_importances(x, model):
+    return pd.concat((pd.DataFrame(x.columns, columns = ['variable']), 
+          pd.DataFrame(model.feature_importances_, columns = ['importance'])), 
+          axis = 1).sort_values(by='importance', ascending = False)
+
+
+def get_threat_score(x, y, predict_y):
     pre_core_df = create_correct(y, predict_y)
     correct = pre_core_df['correct']
     predict = pre_core_df['predict']
 
-    tp = train.iloc[pre_core_df[(correct == predict) & (1 == predict)].index, ]
-    tn = train.iloc[pre_core_df[(correct == predict) & (0 == predict)].index, ]
-    fp = train.iloc[pre_core_df[(correct != predict) & (0 != predict)].index, ]
-    fn = train.iloc[pre_core_df[(correct != predict) & (1 != predict)].index, ]
+    tp = x.iloc[pre_core_df[(correct == predict) & (1 == predict)].index, ]
+    tn = x.iloc[pre_core_df[(correct == predict) & (0 == predict)].index, ]
+    fp = x.iloc[pre_core_df[(correct != predict) & (0 != predict)].index, ]
+    fn = x.iloc[pre_core_df[(correct != predict) & (1 != predict)].index, ]
 
     print(tp['Survived'].count(), ':', tn['Survived'].count(), ':', fp['Survived'].count(), ':', fn['Survived'].count())
 
